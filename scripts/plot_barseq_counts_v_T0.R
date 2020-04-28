@@ -148,6 +148,31 @@ merged_df$ES_mean_div_IT001 <- round(as.numeric(merged_df$ES_mean) / merged_df$I
 merged_df$EM_mean_div_IT001 <- round(as.numeric(merged_df$EM_mean) / merged_df$IT001, digits =  4)
 merged_df$ESM_mean_div_IT001 <- round(as.numeric(merged_df$ESM_mean) / merged_df$IT001, digits =  4)
 
+#####INDIVIDUAL####
+
+E_ratio <- select(merged_df, barcode, E_mean_div_IT001)
+ES_ratio <- select(merged_df, barcode, ES_mean_div_IT001)
+EM_ratio <- select(merged_df, barcode, EM_mean_div_IT001)
+ESM_ratio <- select(merged_df, barcode, ESM_mean_div_IT001)
+
+E_ratio <- subset(E_ratio, E_ratio$E_mean_div_IT001 >= 2 | E_ratio$E_mean_div_IT001 <= 0.5)
+ES_ratio <- subset(ES_ratio, ES_ratio$ES_mean_div_IT001 >= 2 | ES_ratio$ES_mean_div_IT001 <= 0.5)
+EM_ratio <- subset(EM_ratio, EM_ratio$EM_mean_div_IT001 >= 2 | EM_ratio$EM_mean_div_IT001 <= 0.5)
+ESM_ratio <- subset(ESM_ratio, ESM_ratio$ESM_mean_div_IT001 >= 2 | ESM_ratio$ESM_mean_div_IT001 <= 0.5)
+
+E_ratio <- E_ratio[E_ratio$E_mean_div_IT001 != 0, ]
+ES_ratio <- ES_ratio[ES_ratio$ES_mean_div_IT001 != 0, ]
+EM_ratio <- EM_ratio[EM_ratio$EM_mean_div_IT001 != 0, ]
+ESM_ratio <- ESM_ratio[ESM_ratio$ESM_mean_div_IT001 != 0, ]
+
+ratio_df_fil <- full_join(E_ratio, ES_ratio, by ="barcode")
+ratio_df_fil <- full_join(ratio_df_fil, EM_ratio, by ="barcode")
+ratio_df_fil <- full_join(ratio_df_fil, ESM_ratio, by ="barcode")
+
+write.table(ratio_df_fil, "~/Documents/PostDoc_Harcombe/TnSeq/BarSeq/data/g/Eo221/ratio_df_NAs.tsv", sep = "\t", quote = FALSE, row.names = FALSE, dec = ".")
+
+
+#####AS WHOLE######
 #build ratio df with barcodes
 ratio_df <- select(merged_df, barcode, E_mean_div_IT001, ES_mean_div_IT001, EM_mean_div_IT001, ESM_mean_div_IT001)
 
@@ -171,23 +196,36 @@ ratio_df <- ratio_df[ratio_df$ESM_mean_div_IT001 != 0, ]
 
 dep_means <- names(merged_df)[27:30]
 
+#create df for this section important becasue lm and cook's distance use a different format
+lm_df <- merged_df
+
+#change df format for lm and cooks.distance
+row.names(lm_df) = lm_df$barcode
+lm_df <- lm_df %>% select(-barcode)
+
 setwd("../g/figures/")
 for (d in dep_means) {
   print(d)
   #need get() to convert string list to an object
-  linearMod <- lm(IT001 ~ get(d), data = merged_df)
+  linearMod <- lm(IT001 ~ get(d), data = lm_df)
   print(linearMod)
   summary(linearMod)
   #plot(linearMod, pch = 18, col = "red", sub.caption = paste("IT001 ~", d, sep = " "))
-  #old <- par(oma = c(0,0,2,0), mfrow = c(3,2))
+  ###open image, plot figure, save to image
   png(filename = paste("IT001_vs_", d, ".png", sep = ""), width = 1920, height = 1080)
+  ###par adjusts margins and sets figure layout
   par(oma = c(0,0,2,0), mfrow = c(3,2))
+  #add 'labels.id = merged_df$barcode' below if labels should be barcodes
   plot(linearMod, pch = 18, col = "red", which = c(1,2,3,4,5,6), ask = FALSE, sub.caption = paste("Time0 ~", d, sep = " "), cex.id = 1.30, cex.oma.main = 1.75, cex.caption = 1.50)
   dev.off()
-  #mtext("Test title", outer = TRUE, cex = 1.5)
-  #par(old)
 }
 
+#cooks distance
+mycds <- cooks.distance(linearMod)
+mycds <- rev(sort(mycds))
+
+#extract info from specific barcode
+lm_df["CCTCACTTCCCACTGATCTC",]
 
 
 ######The long way
